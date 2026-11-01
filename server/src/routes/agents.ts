@@ -3140,6 +3140,42 @@ export function agentRoutes(
       res.json(await listOpenRouterModels(refresh));
       return;
     }
+    if (type === "opencode_local" && provider && provider !== "openrouter" && typeof req.query.aiConnection === "string") {
+      if (req.query.aiConnection.length > 4096) throw unprocessable("Invalid AI connection binding");
+      let binding: AiConnectionBinding;
+      try { binding = aiConnectionBindingSchema.parse(JSON.parse(req.query.aiConnection)); }
+      catch { throw unprocessable("Invalid AI connection binding"); }
+      const selection = await aiConnectionService(db).select({
+        companyId,
+        userId: responsibleUserForAiRequest(req),
+        agentId: "00000000-0000-0000-0000-000000000000",
+        adapterType: type,
+        binding,
+        allowUninstalledPersonal: true,
+        allowUninstalledShared: true,
+      });
+      const metadata = aiConnectionMetadataSchema.parse(selection.connection.config.ai);
+      const route = metadata.routing;
+      if (!route || !["gateway", "local"].includes(route.kind) || !route.baseUrl) {
+        res.json([]);
+        return;
+      }
+      const url = `${route.baseUrl.replace(/\/+$/, "")}/models`;
+      const credential = await aiConnectionService(db).credential(selection);
+      const headers: Record<string, string> = { Accept: "application/json" };
+      if (route.auth === "bearer" && credential) headers.Authorization = `Bearer ${credential}`;
+      if (route.auth === "api_key" && credential) headers["x-api-key"] = credential;
+      const response = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) });
+      if (!response.ok) throw unprocessable(`The selected connection could not load its model catalog (${response.status}).`);
+      const body = await response.json() as { data?: unknown; models?: unknown };
+      const entries = Array.isArray(body.data) ? body.data : Array.isArray(body.models) ? body.models : [];
+      res.json(entries.flatMap((entry) => {
+        if (!entry || typeof entry !== "object" || typeof (entry as { id?: unknown }).id !== "string") return [];
+        const item = entry as { id: string; name?: unknown };
+        return [{ id: item.id, label: typeof item.name === "string" && item.name.trim() ? item.name : item.id }];
+      }));
+      return;
+    }
     if (type === "paperclip_runner" && provider && !isPaperclipRunnerProvider(provider)) {
       throw unprocessable("Unknown Paperclip Runner provider");
     }

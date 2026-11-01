@@ -263,3 +263,22 @@ it("explains that NVIDIA Chat Completions needs an OpenCode-compatible harness",
   expect(container.textContent).toContain("cannot run Claude Code");
   expect(container.textContent).toContain("Messages API connection");
 });
+
+it("accepts a Free Claude Code Messages connection for Claude Code", async () => {
+  const freeClaude = account({
+    id: "free-claude",
+    grantId: "free-claude-grant",
+    provider: "anthropic",
+    method: "api_key",
+    name: "Free Claude Code",
+    routing: { kind: "local", protocol: "messages", baseUrl: "http://localhost:8082", auth: "bearer", models: [] },
+  });
+  mocks.list.mockResolvedValue({ currentUserId: "owner", connections: [freeClaude], canManageConnections: true });
+  flushSync(() => root.render(<QueryClientProvider client={client}>
+    <AiConnectionField companyId="company" agentId="agent" agentName="Claude" adapterType="claude_local" model="claude-opus-5-5"
+      value={{ provider: "anthropic", method: "api_key", mode: "delegated", connectionId: freeClaude.id, grantId: freeClaude.grantId }} onChange={onChange} />
+  </QueryClientProvider>));
+  await settle();
+  expect(container.textContent).not.toContain("does not support");
+  expect(container.textContent).not.toContain("incompatible");
+});

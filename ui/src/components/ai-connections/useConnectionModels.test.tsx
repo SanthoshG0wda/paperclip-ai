@@ -38,6 +38,7 @@ afterEach(async () => {
 });
 
 async function mount(accounts: AiManagedConnectionSummary[] = [account], harness = "opencode_local", value: AiConnectionBinding | undefined = binding) {
+  vi.mocked(aiConnectionsApi.list).mockResolvedValue({ currentUserId: "you", connections: accounts, canManageConnections: true });
   client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   client.setQueryData(["ai-connections", "company"], { currentUserId: "you", connections: accounts });
   root = createRoot(document.createElement("div"));
@@ -65,7 +66,7 @@ it("also discovers models for legacy OpenRouter connections without routing meta
 
 it("preserves an explicit connection model list instead of replacing it with the public catalog", async () => {
   await mount([{ ...account, routing: { ...account.routing!, models: [{ id: "company/model", label: "Approved model" }] } }]);
-  expect(result?.models).toEqual([{ id: "openrouter/company/model", label: "Approved model" }]);
+  await vi.waitFor(() => expect(result?.models).toEqual([{ id: "openrouter/company/model", label: "Approved model" }]));
   expect(agentsApi.adapterModels).not.toHaveBeenCalled();
 });
 
@@ -73,10 +74,12 @@ it("does not reuse public OpenRouter models after switching to a custom gateway"
   const gateway: AiManagedConnectionSummary = { ...account, id: "gateway", grantId: "gateway-grant", provider: "openai", routing: { kind: "gateway", protocol: "chat", auth: "bearer", baseUrl: "https://example.com/v1", models: [] } };
   await mount([account, gateway]);
   await vi.waitFor(() => expect(result?.models).toEqual(catalog));
+  vi.mocked(agentsApi.adapterModels).mockResolvedValueOnce([]);
   await render({ provider: "openai", method: "api_key", mode: "shared", connectionId: gateway.id, grantId: gateway.grantId });
-  expect(result?.models).toEqual([]);
+  await vi.waitFor(() => expect(result?.models).toEqual([]));
+  expect(agentsApi.adapterModels).toHaveBeenLastCalledWith("company", "opencode_local", expect.objectContaining({ provider: "openai", refresh: true, aiConnection: expect.objectContaining({ connectionId: "gateway" }) }));
   expect(result?.resolveModel("private-model")).toBe("paperclip/private-model");
-  expect(result?.refreshModels).toBeUndefined();
+  expect(result?.refreshModels).toBeDefined();
 });
 
 it("returns every model saved on a custom gateway connection", async () => {
@@ -104,11 +107,11 @@ it("returns every model saved on a custom gateway connection", async () => {
     connectionId: gateway.id,
     grantId: gateway.grantId,
   });
-  expect(result?.models).toEqual([
+  await vi.waitFor(() => expect(result?.models).toEqual([
     { id: "paperclip/meta/llama-3.3-70b-instruct", label: "meta/llama-3.3-70b-instruct" },
     { id: "paperclip/qwen/qwen3-coder", label: "qwen/qwen3-coder" },
     { id: "paperclip/mistralai/mistral-small", label: "mistralai/mistral-small" },
-  ]);
+  ]));
 });
 
 it("leaves native model discovery alone", async () => {
@@ -129,7 +132,7 @@ it("exposes loading and allows retry after a catalog failure", async () => {
   let reject!: (error: Error) => void;
   vi.mocked(agentsApi.adapterModels).mockReturnValueOnce(new Promise((_, rejectPromise) => { reject = rejectPromise; }));
   await mount();
-  expect(result?.isLoading).toBe(true);
+  await vi.waitFor(() => expect(result?.isLoading).toBe(true));
   await act(async () => reject(new Error("Catalog unavailable")));
   await vi.waitFor(() => expect(result?.error?.message).toBe("Catalog unavailable"));
   expect(result?.isLoading).toBe(false);

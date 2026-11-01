@@ -91,6 +91,7 @@ export async function assertManagedAiProjectAuth(
   config: Record<string, unknown>,
   provider: AiConnectionBinding["provider"],
   target?: AdapterExecutionTarget | null,
+  harness?: string,
 ) {
   const extraArgs = [
     ...(Array.isArray(config.extraArgs) ? config.extraArgs : []),
@@ -111,7 +112,9 @@ export async function assertManagedAiProjectAuth(
     );
   }
   const files =
-    provider === "anthropic"
+    config.managedAiRouting || harness === "opencode_local" || harness === "hermes_local"
+      ? []
+      : provider === "anthropic"
       ? [".claude/settings.json", ".claude/settings.local.json"]
       : provider === "openai"
         ? [".codex/config.toml"]
@@ -272,7 +275,6 @@ export async function prepareManagedAiRuntime(
       );
   }
   const harness = aiRoutingHarness(input.adapterType, input.config.provider, input.config.acpxAgent);
-  await assertManagedAiProjectAuth(input.config, harness === "claude_local" ? "anthropic" : harness === "codex_local" ? "openai" : input.binding.provider);
   const service = aiConnectionService(db);
   let selection = await service.select({
     ...input,
@@ -303,6 +305,8 @@ export async function prepareManagedAiRuntime(
       );
     const credentialRef = selection.grant.credentialSecretRefs.find((ref) => ref.configPath === "ai.credential");
     const routing = aiConnectionMetadataSchema.parse(selection.connection.config.ai).routing;
+    await assertManagedAiProjectAuth({ ...input.config, ...(routing ? { managedAiRouting: routing } : {}) },
+      harness === "claude_local" ? "anthropic" : harness === "codex_local" ? "openai" : input.binding.provider, undefined, harness);
     const noAuth = routing?.auth === "none";
     if (!noAuth && !credentialRef) throw unprocessable("The selected AI credential is unavailable");
     const readFreshness = async () => {

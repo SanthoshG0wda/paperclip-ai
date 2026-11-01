@@ -412,8 +412,8 @@ export async function findAdoptableLocalService(input: {
   url?: string | null;
 }) {
   const record =
-    await readLocalServiceRegistryRecord(input.serviceKey)
-    ?? await adoptLocalServiceFromPortOwner(input);
+    (input.port ? await adoptLocalServiceFromPortOwner(input) : null)
+    ?? await readLocalServiceRegistryRecord(input.serviceKey);
   if (!record) return null;
 
   if (!isPidAlive(record.pid)) {
@@ -495,8 +495,15 @@ async function adoptLocalServiceFromPortOwner(input: {
 
   if (input.cwd) {
     const ownerCwd = await readLocalServiceProcessCwd(ownerPid);
-    if (!ownerCwd || !(await isLocalServiceProcessInWorkspace(ownerCwd, input.cwd))) {
-      return null;
+    if (ownerCwd) {
+      if (!(await isLocalServiceProcessInWorkspace(ownerCwd, input.cwd))) return null;
+    } else {
+      const ownerCommandLine = await readLocalServiceProcessCommandLine(ownerPid);
+      if (
+        process.platform !== "win32"
+        || !ownerCommandLine
+        || !isLocalServiceProcessCommandLineInWorkspace(ownerCommandLine, input.cwd)
+      ) return null;
     }
   }
 
@@ -678,6 +685,28 @@ export async function readLocalServiceProcessCwd(pid: number) {
     }
   }
   return null;
+}
+
+async function readLocalServiceProcessCommandLine(pid: number) {
+  if (!Number.isInteger(pid) || pid <= 0 || process.platform !== "win32") return null;
+  try {
+    const script = `$process = Get-CimInstance Win32_Process -Filter \"ProcessId = ${pid}\" -ErrorAction SilentlyContinue; if ($process) { Write-Output $process.CommandLine }`;
+    const { stdout } = await execFileAsync("powershell.exe", [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      script,
+    ]);
+    const commandLine = stdout.trim();
+    return commandLine || null;
+  } catch {
+    return null;
+  }
+}
+
+export function isLocalServiceProcessCommandLineInWorkspace(commandLine: string, workspaceCwd: string) {
+  const normalize = (value: string) => value.replace(/[\\/]+/g, "\\").replace(/\\+$/, "").toLowerCase();
+  return commandLine.replace(/[\\/]+/g, "\\").toLowerCase().includes(normalize(workspaceCwd));
 }
 
 export async function isLocalServiceProcessInWorkspace(processCwd: string, workspaceCwd: string) {

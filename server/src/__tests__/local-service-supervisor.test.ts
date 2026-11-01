@@ -12,6 +12,7 @@ import {
 import {
   doesLocalServiceCommandLineMatch,
   isLocalServiceCommandLineComparable,
+  isLocalServiceProcessCommandLineInWorkspace,
   listLocalServiceRegistryRecords,
   readLocalServicePortOwner,
   resolveLocalServiceLogPath,
@@ -169,5 +170,16 @@ describe("local service supervision", () => {
       recordedCommand: "node ./server.js",
       serviceName: "web",
     })).toBe(false);
+  });
+
+  it("recognizes a Windows service command line from its workspace path", () => {
+    expect(isLocalServiceProcessCommandLineInWorkspace(
+      '"C:\\Program Files\\nodejs\\node.exe" C:\\Users\\HP\\Desktop\\paperclip\\server\\src\\index.ts',
+      "C:/Users/HP/Desktop/paperclip",
+    )).toBe(true);
+    expect(isLocalServiceProcessCommandLineInWorkspace(
+      "C:\\Users\\HP\\Desktop\\other-project\\server\\src\\index.ts",
+      "C:/Users/HP/Desktop/paperclip",
+    )).toBe(false);
   });
 });

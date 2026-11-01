@@ -573,7 +573,8 @@ export function agentEnvironmentTestService(db: Db, pluginWorkerManager?: Plugin
         return { adapterType, status: "fail" as const, testedAt: new Date().toISOString(), checks: [{ code: error instanceof HttpError ? String(asRecord(error.details)?.code ?? "COPILOT_REQUEST_FAILED") : "COPILOT_REQUEST_FAILED", level: "error" as const, message: error instanceof HttpError ? error.message : "Copilot metadata verification failed." }] };
       }
     }
-    await assertManagedAiProjectAuth(context.config, binding.provider, context.executionTarget);
+    await assertManagedAiProjectAuth(context.config, binding.provider, context.executionTarget,
+      aiRoutingHarness(adapterType, context.config.provider, context.config.acpxAgent));
     const target = context.executionTarget;
     const result = adapterType === "paperclip_runner" && target?.kind === "remote" && target.transport === "sandbox" && target.runnerTask
       ? await probePluginRunnerEnvironment(context, { identity: managed.identity, accountIdentity: managed.sessionIdentity,

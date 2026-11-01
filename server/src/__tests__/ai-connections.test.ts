@@ -1852,6 +1852,14 @@ console.log(JSON.stringify({ type: "result", subtype: "success", result: "hello"
       await expect(assertManagedAiProjectAuth({ args: ["--api-key=override"] }, "xai", target)).rejects.toThrow("overrides");
     } finally { execute.mockRestore(); }
   });
+  it("does not apply Codex project auth checks to OpenCode connections", async () => {
+    const execute = vi.spyOn(executionTarget, "runAdapterExecutionTargetProcess");
+    const target = { kind: "remote", transport: "sandbox", remoteCwd: "/workspace/project" } as Parameters<typeof assertManagedAiProjectAuth>[2];
+    try {
+      await expect(assertManagedAiProjectAuth({}, "openai", target, "opencode_local")).resolves.toBeUndefined();
+      expect(execute).not.toHaveBeenCalled();
+    } finally { execute.mockRestore(); }
+  });
   it("requires a typed project authentication capability for task-only environments", async () => {
     const execute = vi.spyOn(executionTarget, "runAdapterExecutionTargetProcess");
     const description = { kind: "description", taskId: "task", projectAuthCheckVersion: 1,

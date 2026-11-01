@@ -164,6 +164,7 @@ export function AiProviderSetup({
   const [models, setModels] = useState(
     reconnect?.routing?.models.map((m) => m.id).join(", ") ?? initialModels?.join(", ") ?? "",
   );
+  const [connectionName, setConnectionName] = useState("");
   const [apiKey, setApiKey] = useState("");
   const client = useQueryClient();
   const accounts = useQuery({
@@ -189,8 +190,7 @@ export function AiProviderSetup({
           ? "anthropic"
           : "openai"
         : (provider ?? "openai") as AiProvider);
-  const name =
-    reconnect?.name ??
+  const suggestedName =
     `${ownership === "personal" ? "My" : "Company"} ${
       (routeKind === "gateway" || routeKind === "local") && baseUrl
         ? (() => {
@@ -202,6 +202,7 @@ export function AiProviderSetup({
           })()
         : label
     }`;
+  const name = reconnect?.name ?? (connectionName.trim() || suggestedName);
   const complete = (result: {
     connectionId: string;
     grantId: string;
@@ -359,7 +360,6 @@ export function AiProviderSetup({
           initialMethod={reconnect?.method}
           fixedMethod={Boolean(reconnect)}
           name={name}
-          hideName
           ownership={ownership}
           allAgents={allAgents}
           agentIds={[...agentIds]}
@@ -377,6 +377,16 @@ export function AiProviderSetup({
             save.mutate();
           }}
         >
+          <label className="block space-y-2 text-xs text-muted-foreground">
+            Connection name
+            <Input
+              aria-label="Connection name"
+              placeholder={suggestedName}
+              value={connectionName}
+              onChange={(e) => setConnectionName(e.target.value)}
+              disabled={Boolean(reconnect)}
+            />
+          </label>
           {(routeKind === "gateway" || routeKind === "local") && (
             <>
               <label className="block space-y-2 text-xs text-muted-foreground">

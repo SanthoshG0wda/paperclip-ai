@@ -31,7 +31,6 @@ it("reconnects an older OpenRouter account without adding routing metadata", asy
     client.clear();
   }
 });
-
 const providerSources = ["openrouter", "bedrock", "responses-api", "messages-api", "chat-completions-api", "local", "nvidia-nim", "omniroute", "free-claude-code"];
 it("shows advanced providers directly when entered from advanced connection mode", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -48,7 +47,6 @@ it("shows advanced providers directly when entered from advanced connection mode
     await act(async () => root.unmount()); client.clear();
   }
 });
-
 it.each(providerSources)("opens %s directly with shared access folded under Advanced", async source => {
   const preset = aiProviderSetupPreset(source)!;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });

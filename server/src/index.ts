@@ -86,6 +86,7 @@ import { resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { pathToFileURL } from "node:url";
+import { setTimeout as delay } from "node:timers/promises";
 import type { Request as ExpressRequest, RequestHandler } from "express";
 import { warnIfUnsupportedNodeVersion } from "@paperclipai/shared/node-version";
 import { and, eq } from "drizzle-orm";
@@ -591,7 +592,15 @@ async function startServerWithDatabaseTeardown(
       }
     };
   
-    const runningPid = getRunningPid();
+    let runningPid = getRunningPid();
+    // A previous server can be handing PostgreSQL off while this process starts.
+    // Give its postmaster time to publish the pid before treating the lock as stale.
+    if (!runningPid && existsSync(postmasterPidFile)) {
+      for (let attempt = 0; attempt < 10 && !runningPid; attempt += 1) {
+        await delay(100);
+        runningPid = getRunningPid();
+      }
+    }
     if (runningPid) {
       port = embeddedPostgresOwnerPort(readFileSync(postmasterPidFile, "utf8"), dataDir, runningPid);
       const actualDataDir = await getPostgresDataDirectory(`postgres://paperclip:paperclip@127.0.0.1:${port}/postgres`);

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:net";
 import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { ensurePostgresDatabase, getPostgresDataDirectory } from "./client.js";
 import { createEmbeddedPostgresLogBuffer, formatEmbeddedPostgresError } from "./embedded-postgres-error.js";
 import { prepareEmbeddedPostgresNativeRuntime } from "./embedded-postgres-native.js";
@@ -97,7 +98,15 @@ async function ensureEmbeddedPostgresConnection(
   const selectedPort = await findAvailablePort(preferredPort);
   const postmasterPidFile = path.resolve(dataDir, "postmaster.pid");
   const pgVersionFile = path.resolve(dataDir, "PG_VERSION");
-  const runningPid = readRunningPostmasterPid(postmasterPidFile);
+  let runningPid = readRunningPostmasterPid(postmasterPidFile);
+  // A previous server can be handing PostgreSQL off while migrations start.
+  // Do not remove a lock that becomes live during that short transition.
+  if (!runningPid && existsSync(postmasterPidFile)) {
+    for (let attempt = 0; attempt < 10 && !runningPid; attempt += 1) {
+      await delay(100);
+      runningPid = readRunningPostmasterPid(postmasterPidFile);
+    }
+  }
   const runningPort = readPidFilePort(postmasterPidFile);
   const preferredAdminConnectionString = `postgres://paperclip:paperclip@127.0.0.1:${preferredPort}/postgres`;
   const logBuffer = createEmbeddedPostgresLogBuffer();

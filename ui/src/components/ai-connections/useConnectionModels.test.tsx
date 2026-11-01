@@ -79,6 +79,38 @@ it("does not reuse public OpenRouter models after switching to a custom gateway"
   expect(result?.refreshModels).toBeUndefined();
 });
 
+it("returns every model saved on a custom gateway connection", async () => {
+  const gateway: AiManagedConnectionSummary = {
+    ...account,
+    id: "gateway",
+    grantId: "gateway-grant",
+    provider: "openai",
+    routing: {
+      kind: "gateway",
+      protocol: "chat",
+      auth: "bearer",
+      baseUrl: "https://example.com/v1",
+      models: [
+        { id: "meta/llama-3.3-70b-instruct" },
+        { id: "qwen/qwen3-coder" },
+        { id: "mistralai/mistral-small" },
+      ],
+    },
+  };
+  await mount([gateway], "opencode_local", {
+    provider: "openai",
+    method: "api_key",
+    mode: "shared",
+    connectionId: gateway.id,
+    grantId: gateway.grantId,
+  });
+  expect(result?.models).toEqual([
+    { id: "paperclip/meta/llama-3.3-70b-instruct", label: "meta/llama-3.3-70b-instruct" },
+    { id: "paperclip/qwen/qwen3-coder", label: "qwen/qwen3-coder" },
+    { id: "paperclip/mistralai/mistral-small", label: "mistralai/mistral-small" },
+  ]);
+});
+
 it("leaves native model discovery alone", async () => {
   await mount([], "codex_local", { provider: "openai", method: "subscription", mode: "responsible_user" });
   expect(result).toBeUndefined();

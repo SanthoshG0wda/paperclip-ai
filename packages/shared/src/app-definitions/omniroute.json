@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "slug": "omniroute",
+  "name": "OmniRoute",
+  "description": "Connect a local OmniRoute multi-provider gateway.",
+  "categories": ["ai"],
+  "branding": {"logoUrl": "/brands/apps/api-key-generic.svg"},
+  "urlPatterns": ["http://localhost:20128/*"],
+  "methods": [{
+    "key": "ai-api_key",
+    "label": "OmniRoute endpoint key",
+    "purpose": "ai",
+    "transport": "runtime_auth",
+    "auth": "api_key",
+    "ai": {"provider": "openai", "method": "api_key"},
+    "grantKinds": ["user", "organization"],
+    "ownershipModes": ["customer"],
+    "whenToUse": "Connect an agent to a local OmniRoute gateway.",
+    "guidanceMd": "Start OmniRoute locally and use its OpenAI-compatible base URL http://localhost:20128/v1. Create an endpoint key in the OmniRoute dashboard when authentication is enabled.",
+    "riskTier": "S3",
+    "credentialFields": [{"key": "apiKey", "label": "Endpoint API key", "type": "password", "required": true, "placeholder": "Paste endpoint key", "secret": true}],
+    "keyPlacement": {"location": "env", "name": "OMNIROUTE_API_KEY"}
+  }],
+  "tags": ["model-provider", "gateway", "local"]
+}

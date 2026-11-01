@@ -155,6 +155,8 @@ type Step = 0 | 1 | 2 | 3 | 4 | 5;
 // wizard's registry-driven approach rather than a fixed union.
 type AdapterType = string;
 
+// Adapters that use the shared native model discovery/runner flow. The source
+// picker below is registry-driven and must not be limited to this set.
 const ONBOARDING_ADAPTER_TYPES = new Set(["claude_local", "codex_local"]);
 
 function restoreOnboardingAdapterType(savedAdapterType: unknown, provider?: unknown, savedCopilot?: unknown): AdapterType {
@@ -1235,18 +1237,20 @@ function OnboardingWizardInner({
   // Build adapter grids dynamically from the UI registry + display metadata.
   // External/plugin adapters automatically appear with generic defaults, and
   // server-disabled types are filtered out.
-  const { recommendedAdapters, moreAdapters } = useMemo(() => {
+  const { availableAdapters } = useMemo(() => {
     const all = listUIAdapters()
       .filter((a) =>
-        ONBOARDING_ADAPTER_TYPES.has(a.type) &&
         !disabledTypes.has(a.type) &&
-        isVisualAdapterChoice(a.type)
+        isVisualAdapterChoice(a.type) &&
+        !getAdapterDisplay(a.type).comingSoon
       )
       .map((a) => ({ ...getAdapterDisplay(a.type), type: a.type }));
 
     return {
-      recommendedAdapters: all.filter((a) => a.recommended),
-      moreAdapters: all.filter((a) => !a.recommended),
+      // Every enabled visual adapter is a valid onboarding source. The
+      // registry's `recommended` flag is descriptive metadata, not a product
+      // capability gate.
+      availableAdapters: all,
     };
   }, [disabledTypes]);
 
@@ -1256,7 +1260,7 @@ function OnboardingWizardInner({
    * no longer offers — a selection the customer cannot see.
    */
   const sourceSelected =
-    sourcePicked && recommendedAdapters.some((opt) => opt.type === adapterType);
+    sourcePicked && availableAdapters.some((opt) => opt.type === adapterType);
 
   /**
    * Whether the connect step may advance.
@@ -1303,7 +1307,7 @@ function OnboardingWizardInner({
           return null;
         }
       }
-      const provisionalAdapter = disabledTypes.has("process") ? recommendedAdapters[0]?.type : "process";
+      const provisionalAdapter = disabledTypes.has("process") ? availableAdapters[0]?.type : "process";
       if (!sourceSelected && !provisionalAdapter) throw new Error("No agent adapters are available on this instance.");
       const createAdapter = sourceSelected ? adapterType : provisionalAdapter!;
       if (!stillTheSameCompany(companyId)) return null;
@@ -1672,9 +1676,7 @@ function OnboardingWizardInner({
     // external adapter is indistinguishable from a disabled one - and snapping
     // would replace the customer's choice with a built-in and persist it.
     if (!adapterRegistryLoaded) return;
-    const visible = [...recommendedAdapters, ...moreAdapters].filter(
-      (a) => !a.comingSoon,
-    );
+    const visible = availableAdapters;
     if (visible.length === 0) {
       if (!ONBOARDING_ADAPTER_TYPES.has(adapterType)) { setAdapterType("claude_local"); setModel(""); setSourcePicked(false); }
       return;
@@ -1702,7 +1704,7 @@ function OnboardingWizardInner({
       return;
     }
     setModel("");
-  }, [adapterRegistryLoaded, recommendedAdapters, moreAdapters, adapterType]);
+  }, [adapterRegistryLoaded, availableAdapters, adapterType]);
 
   const COMMAND_PLACEHOLDERS: Record<string, string> = {
     claude_local: "claude",
@@ -2454,8 +2456,12 @@ function OnboardingWizardInner({
         if (blocksAgentCreate(result)) {
           const nativeCodexError = adapterType === "codex_local" && result.adapterType === "paperclip_runner"
             ? result.checks.find(check => check.level === "error")?.message : undefined;
+          const failedCheck = result.checks.find(check => check.level === "error");
+          const failedCheckMessage = failedCheck
+            ? `${failedCheck.message}${failedCheck.detail ? ` (${failedCheck.detail})` : ""}`
+            : undefined;
           setError(
-            nativeCodexError || (result.status === "fail"
+            nativeCodexError || failedCheckMessage || (result.status === "fail"
               ? cloudInstance
                 ? "Paperclip couldn't finish connecting this agent. Try connecting again."
                 : "The environment test failed. Fix the reported checks before you hire this agent."
@@ -2984,7 +2990,7 @@ function OnboardingWizardInner({
                   <div>
                     <ModelSourceTiles
                       label="Model source"
-                      sources={recommendedAdapters.map((opt) => ({
+                      sources={availableAdapters.map((opt) => ({
                         id: opt.type,
                         label: CONNECT_SOURCE_NAMES[opt.type] ?? opt.label,
                         icon: <ModelSourceMark type={opt.type} Fallback={opt.icon} />,
@@ -2992,7 +2998,7 @@ function OnboardingWizardInner({
                       mode={credentialMode}
                       selectedId={
                         sourcePicked &&
-                        recommendedAdapters.some((opt) => opt.type === adapterType)
+                        availableAdapters.some((opt) => opt.type === adapterType)
                           ? adapterType
                           : null
                       }
@@ -3012,9 +3018,9 @@ function OnboardingWizardInner({
                       }}
                     />
 
-                    {adapterRegistryLoaded && recommendedAdapters.length === 0 && (
+                    {adapterRegistryLoaded && availableAdapters.length === 0 && (
                       <p role="status" className="text-sm text-muted-foreground">
-                        Claude and Codex are unavailable on this instance. Ask an administrator to enable one,
+                        No model sources are available on this instance. Ask an administrator to enable one,
                         or exit setup and choose New Agent on the Agents page to use another provider.
                       </p>
                     )}

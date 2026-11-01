@@ -148,9 +148,15 @@ export function aiConnectionCatalogSlug(provider: string, routing?: Pick<AiProvi
 export function aiProviderSetupPreset(source: string | null): {
   provider: "openrouter" | "bedrock" | "gateway" | "local" | "google";
   protocol?: AiProviderRouting["protocol"];
+  auth?: AiProviderRouting["auth"];
+  baseUrl?: string;
+  models?: string[];
   label?: string;
 } | undefined {
   switch (source) {
+    case "nvidia-nim": return { provider: "gateway", protocol: "chat", auth: "bearer", baseUrl: "https://integrate.api.nvidia.com/v1", label: "NVIDIA NIM" };
+    case "omniroute": return { provider: "local", protocol: "chat", auth: "bearer", baseUrl: "http://localhost:20128/v1", label: "OmniRoute" };
+    case "free-claude-code": return { provider: "local", protocol: "messages", auth: "bearer", baseUrl: "http://localhost:8082", label: "Free Claude Code" };
     case "responses-api": return { provider: "gateway", protocol: "responses", label: "Responses API" };
     case "messages-api": return { provider: "gateway", protocol: "messages", label: "Messages API" };
     case "chat-completions-api": return { provider: "gateway", protocol: "chat", label: "Chat Completions API" };

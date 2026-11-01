@@ -62,8 +62,45 @@ const providers = [
     description: "A model server in the agent’s environment",
     advanced: true,
   },
+  {
+    id: "nvidia_nim",
+    name: "NVIDIA NIM",
+    description: "NVIDIA-hosted OpenAI-compatible inference",
+    advanced: true,
+    routeKind: "gateway",
+    nativeProvider: "openai",
+    protocol: "chat",
+    baseUrl: "https://integrate.api.nvidia.com/v1",
+  },
+  {
+    id: "omniroute",
+    name: "OmniRoute",
+    description: "Local multi-provider OpenAI-compatible gateway",
+    advanced: true,
+    routeKind: "local",
+    nativeProvider: "openai",
+    protocol: "chat",
+    baseUrl: "http://localhost:20128/v1",
+  },
+  {
+    id: "free_claude_code",
+    name: "Free Claude Code",
+    description: "Local Anthropic-compatible Claude Code proxy",
+    advanced: true,
+    routeKind: "local",
+    nativeProvider: "anthropic",
+    protocol: "messages",
+    baseUrl: "http://localhost:8082",
+  },
 ] as const;
 type ProviderChoice = (typeof providers)[number]["id"] | "github";
+type ProviderOption = (typeof providers)[number] & {
+  routeKind?: string;
+  nativeProvider?: AiProvider;
+  protocol?: AiProviderRouting["protocol"];
+  auth?: AiProviderRouting["auth"];
+  baseUrl?: string;
+};
 
 export function AiProviderSetup({
   companyId,
@@ -72,6 +109,9 @@ export function AiProviderSetup({
   initialProvider,
   initialProtocol,
   providerLabel,
+  initialBaseUrl,
+  initialAuth,
+  initialModels,
   advancedOnly = false,
   submitLabel,
   reconnect,
@@ -84,6 +124,9 @@ export function AiProviderSetup({
   initialProvider?: ProviderChoice;
   initialProtocol?: AiProviderRouting["protocol"];
   providerLabel?: string;
+  initialBaseUrl?: string;
+  initialAuth?: AiProviderRouting["auth"];
+  initialModels?: string[];
   advancedOnly?: boolean;
   submitLabel?: string;
   reconnect?: AiManagedConnectionSummary;
@@ -92,6 +135,7 @@ export function AiProviderSetup({
     binding: Exclude<AiConnectionBinding, { mode: "responsible_user" }>,
   ) => void;
 }) {
+  const initialOption = providers.find((item) => item.id === initialProvider) as ProviderOption | undefined;
   const [provider, setProvider] = useState<ProviderChoice | undefined>(
     reconnect
       ? reconnect.routing?.kind === "gateway" ||
@@ -108,17 +152,17 @@ export function AiProviderSetup({
   const [allAgentsChoice, setAllAgents] = useState<boolean>();
   const [agentIds, setAgentIds] = useState(new Set(agentId ? [agentId] : []));
   const [protocol, setProtocol] = useState<AiProviderRouting["protocol"]>(
-    reconnect?.routing?.protocol ?? initialProtocol ?? "responses",
+    reconnect?.routing?.protocol ?? initialProtocol ?? initialOption?.protocol ?? "responses",
   );
   const [auth, setAuth] = useState<AiProviderRouting["auth"]>(
-    reconnect?.routing?.auth ?? "bearer",
+    reconnect?.routing?.auth ?? initialAuth ?? initialOption?.auth ?? "bearer",
   );
-  const [baseUrl, setBaseUrl] = useState(reconnect?.routing?.baseUrl ?? "");
+  const [baseUrl, setBaseUrl] = useState(reconnect?.routing?.baseUrl ?? initialBaseUrl ?? initialOption?.baseUrl ?? "");
   const [region, setRegion] = useState(
     reconnect?.routing?.region ?? "us-east-1",
   );
   const [models, setModels] = useState(
-    reconnect?.routing?.models.map((m) => m.id).join(", ") ?? "",
+    reconnect?.routing?.models.map((m) => m.id).join(", ") ?? initialModels?.join(", ") ?? "",
   );
   const [apiKey, setApiKey] = useState("");
   const client = useQueryClient();
@@ -133,20 +177,22 @@ export function AiProviderSetup({
     queryKey: ["agents", companyId, "provider-access"],
     queryFn: () => agentsApi.list(companyId),
   });
-  const label = providerLabel ?? providers.find((p) => p.id === provider)?.name ?? (provider === "github" ? "GitHub Copilot" : "provider");
-  const advanced = reconnect ? Boolean(reconnect.routing) : ["openrouter", "bedrock", "gateway", "local"].includes(provider ?? "");
+  const option = providers.find((item) => item.id === provider) as ProviderOption | undefined;
+  const routeKind = option?.routeKind ?? provider;
+  const label = providerLabel ?? option?.name ?? (provider === "github" ? "GitHub Copilot" : "provider");
+  const advanced = reconnect ? Boolean(reconnect.routing) : ["openrouter", "bedrock", "gateway", "local"].includes(routeKind ?? "");
   const nativeProvider: AiProvider =
-    provider === "bedrock"
+    option?.nativeProvider ?? (provider === "bedrock"
       ? "anthropic"
       : provider === "gateway" || provider === "local"
         ? protocol === "messages"
           ? "anthropic"
           : "openai"
-        : (provider ?? "openai");
+        : (provider ?? "openai") as AiProvider);
   const name =
     reconnect?.name ??
     `${ownership === "personal" ? "My" : "Company"} ${
-      provider === "gateway" && baseUrl
+      (routeKind === "gateway" || routeKind === "local") && baseUrl
         ? (() => {
             try {
               return new URL(baseUrl).hostname;
@@ -175,16 +221,16 @@ export function AiProviderSetup({
       const routing =
         reconnect?.routing ??
         aiProviderRoutingSchema.parse({
-          kind: provider,
-          protocol: provider === "bedrock" ? "bedrock" : protocol,
-          auth: provider === "openrouter" ? "bearer" : auth,
-          ...(provider === "bedrock"
+          kind: routeKind,
+          protocol: routeKind === "bedrock" ? "bedrock" : protocol,
+          auth: routeKind === "openrouter" ? "bearer" : auth,
+          ...(routeKind === "bedrock"
             ? { region }
-            : provider === "gateway" || provider === "local"
+            : routeKind === "gateway" || routeKind === "local"
               ? { baseUrl }
               : {}),
           models: models
-            .split(",")
+            .split(/[,\r\n]+/)
             .map((id) => id.trim())
             .filter(Boolean)
             .map((id) => ({ id })),
@@ -213,12 +259,14 @@ export function AiProviderSetup({
     <ConnectionChoiceList
       choices={providers
         .filter((p) => Boolean("advanced" in p && p.advanced) === advancedOnly)
-        .map((p) => ({
+        .map((raw) => {
+          const p = raw as ProviderOption;
+          return {
           ...p,
           icon:
-            p.id === "gateway" || p.id === "local" ? (
+            ("routeKind" in p && (p.routeKind === "gateway" || p.routeKind === "local")) ? (
               <span className="flex size-9 items-center justify-center rounded-lg bg-muted">
-                {p.id === "gateway" ? (
+                {p.routeKind === "gateway" ? (
                   <Network className="size-5" />
                 ) : (
                   <Monitor className="size-5" />
@@ -227,12 +275,16 @@ export function AiProviderSetup({
             ) : (
               <AppLogo name={p.name} brandKey={p.id} />
             ),
-        }))}
+          };
+        })}
       onSelect={(id) => {
+        const selected = providers.find((item) => item.id === id) as ProviderOption | undefined;
         setProvider(id as ProviderChoice);
         setStep("connect");
         setApiKey("");
-        setAuth("bearer");
+        setAuth(selected?.auth ?? "bearer");
+        setProtocol(selected?.protocol ?? "responses");
+        setBaseUrl(selected?.baseUrl ?? "");
         save.reset();
       }}
     />
@@ -325,14 +377,14 @@ export function AiProviderSetup({
             save.mutate();
           }}
         >
-          {(provider === "gateway" || provider === "local") && (
+          {(routeKind === "gateway" || routeKind === "local") && (
             <>
               <label className="block space-y-2 text-xs text-muted-foreground">
                 Provider URL
                 <Input
                   aria-label="Provider URL"
                   placeholder={
-                    provider === "local"
+                    routeKind === "local"
                       ? "http://localhost:11434/v1"
                       : "https://gateway.example.com/v1"
                   }
@@ -370,7 +422,7 @@ export function AiProviderSetup({
               </label>
             </>
           )}
-          {provider === "bedrock" && (
+          {routeKind === "bedrock" && (
             <label className="block space-y-2 text-xs text-muted-foreground">
               AWS region
               <Input
@@ -381,7 +433,7 @@ export function AiProviderSetup({
               />
             </label>
           )}
-          {provider !== "openrouter" && (
+          {routeKind !== "openrouter" && (
             <label className="block space-y-2 text-xs text-muted-foreground">
               Authentication
               <Select
@@ -394,11 +446,11 @@ export function AiProviderSetup({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="bearer">
-                    {provider === "bedrock"
+                    {routeKind === "bedrock"
                       ? "Bedrock API key"
                       : "Bearer token"}
                   </SelectItem>
-                  {provider !== "bedrock" && (
+                  {routeKind !== "bedrock" && (
                     <>
                       {protocol === "messages" && (
                         <SelectItem value="api_key">

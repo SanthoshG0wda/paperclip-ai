@@ -32,7 +32,7 @@ it("reconnects an older OpenRouter account without adding routing metadata", asy
   }
 });
 
-const providerSources = ["openrouter", "bedrock", "responses-api", "messages-api", "chat-completions-api", "local"];
+const providerSources = ["openrouter", "bedrock", "responses-api", "messages-api", "chat-completions-api", "local", "nvidia-nim", "omniroute", "free-claude-code"];
 it("shows advanced providers directly when entered from advanced connection mode", async () => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
   client.setQueryData(["ai-connections", "company", undefined], { canManageConnections: true, connections: [] });
@@ -42,7 +42,7 @@ it("shows advanced providers directly when entered from advanced connection mode
   try {
     await act(async () => root.render(<QueryClientProvider client={client}><AiProviderSetup companyId="company" advancedOnly onCancel={() => {}} onComplete={() => {}} /></QueryClientProvider>));
     const choices = Array.from(container.querySelectorAll("button[aria-label]")).map(button => button.getAttribute("aria-label"));
-    expect(choices).toEqual(["OpenRouter", "Amazon Bedrock", "Custom gateway", "Local endpoint"]);
+    expect(choices).toEqual(["OpenRouter", "Amazon Bedrock", "Custom gateway", "Local endpoint", "NVIDIA NIM", "OmniRoute", "Free Claude Code"]);
     expect(container.querySelector("details")).toBeNull();
   } finally {
     await act(async () => root.unmount()); client.clear();
@@ -59,7 +59,7 @@ it.each(providerSources)("opens %s directly with shared access folded under Adva
   const root = createRoot(container);
   const onCancel = vi.fn();
   try {
-    await act(async () => root.render(<QueryClientProvider client={client}><TooltipProvider><AiProviderSetup companyId="company" initialProvider={preset.provider} initialProtocol={preset.protocol} providerLabel={preset.label} onCancel={onCancel} onComplete={() => {}} /></TooltipProvider></QueryClientProvider>));
+    await act(async () => root.render(<QueryClientProvider client={client}><TooltipProvider><AiProviderSetup companyId="company" initialProvider={preset.provider} initialProtocol={preset.protocol} providerLabel={preset.label} initialBaseUrl={preset.baseUrl} initialAuth={preset.auth} initialModels={preset.models} onCancel={onCancel} onComplete={() => {}} /></TooltipProvider></QueryClientProvider>));
     expect(container.textContent).not.toContain("Connect a model provider");
     expect(container.textContent).toContain("Connects for everyone in your organization, available to all agents.");
     expect(container.querySelector('[role="radio"]')).toBeNull();

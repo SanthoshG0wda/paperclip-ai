@@ -207,3 +207,59 @@ it.each(["openai", "anthropic", "google", "openrouter"] as const)("keeps a match
   expect(choice).toBeDefined();
   expect(choice?.getAttribute("aria-disabled")).not.toBe("true");
 });
+
+it("distinguishes NVIDIA chat and responses connections for OpenCode", async () => {
+  const responses = account({
+    id: "nvidia-responses",
+    grantId: "nvidia-responses-grant",
+    provider: "openai",
+    method: "api_key",
+    name: "Company integrate.api.nvidia.com",
+    ownership: "shared",
+    ownerUserId: undefined,
+    routing: { kind: "gateway", protocol: "responses", auth: "bearer", models: [] },
+  });
+  const chat = account({
+    id: "nvidia-chat",
+    grantId: "nvidia-chat-grant",
+    provider: "openai",
+    method: "api_key",
+    name: "Company integrate.api.nvidia.com",
+    ownership: "shared",
+    ownerUserId: undefined,
+    routing: { kind: "gateway", protocol: "chat", auth: "bearer", models: [] },
+  });
+  mocks.list.mockResolvedValue({ currentUserId: "owner", connections: [responses, chat], canManageConnections: true });
+  flushSync(() => root.render(<QueryClientProvider client={client}>
+    <AiConnectionField companyId="company" agentId="agent" agentName="OpenCode" adapterType="opencode_local"
+      value={{ provider: "openai", method: "api_key", mode: "shared", connectionId: responses.id, grantId: responses.grantId }} onChange={onChange} />
+  </QueryClientProvider>));
+  await settle();
+  expect(container.textContent).toContain("Responses API");
+  expect(container.textContent).toContain("does not support the selected harness");
+  const trigger = container.querySelector('[role="combobox"][aria-label="Connection"]')!;
+  flushSync(() => trigger.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
+  await settle();
+  const choices = [...document.querySelectorAll<HTMLElement>('[role="option"]')];
+  expect(choices.some(choice => choice.textContent?.includes("Chat Completions API"))).toBe(true);
+  expect(choices.some(choice => choice.textContent?.includes("Responses API") && choice.textContent?.includes("Incompatible"))).toBe(true);
+});
+
+it("explains that NVIDIA Chat Completions needs an OpenCode-compatible harness", async () => {
+  const chat = account({
+    id: "nvidia-chat",
+    grantId: "nvidia-chat-grant",
+    provider: "openai",
+    method: "api_key",
+    name: "My integrate.api.nvidia.com",
+    routing: { kind: "gateway", protocol: "chat", auth: "bearer", models: [] },
+  });
+  mocks.list.mockResolvedValue({ currentUserId: "owner", connections: [chat], canManageConnections: true });
+  flushSync(() => root.render(<QueryClientProvider client={client}>
+    <AiConnectionField companyId="company" agentId="agent" agentName="Claude" adapterType="claude_local" model="claude-opus-5-5"
+      value={{ provider: "openai", method: "api_key", mode: "delegated", connectionId: chat.id, grantId: chat.grantId }} onChange={onChange} />
+  </QueryClientProvider>));
+  await settle();
+  expect(container.textContent).toContain("cannot run Claude Code");
+  expect(container.textContent).toContain("Messages API connection");
+});

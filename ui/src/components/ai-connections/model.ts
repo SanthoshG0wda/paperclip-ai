@@ -59,8 +59,16 @@ export function aiMethodLabel(provider: AiProvider, method: AiAuthMethod) {
 
 export function aiConnectionDisplayLabel(connection: AiConnectionSummary) {
   const personal = connection.ownership === "personal";
+  const protocol = connection.routing?.protocol === "responses"
+    ? "Responses API"
+    : connection.routing?.protocol === "messages"
+      ? "Messages API"
+      : connection.routing?.protocol === "chat"
+        ? "Chat Completions API"
+        : undefined;
   return [
     connection.name,
+    protocol,
     aiMethodLabel(connection.provider, connection.method),
     personal ? "Personal" : "Company shared",
     connection.accountLabel || connection.ownerName,

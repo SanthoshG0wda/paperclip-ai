@@ -188,7 +188,10 @@ export function ModelSourceTiles({
     <div
       role="radiogroup"
       aria-label={label}
-      className={cn("flex items-start gap-3", collapsed && "justify-center")}
+      className={cn(
+        "grid w-full gap-3",
+        collapsed ? "grid-cols-1 justify-items-center" : "grid-cols-3 sm:grid-cols-4",
+      )}
       onKeyDown={(event) => {
         // Collapsed, the row is a statement rather than a choice; arrow keys
         // would move a selection that is no longer being asked for.
@@ -219,7 +222,7 @@ export function ModelSourceTiles({
             exit={{ opacity: 0, transition: SOURCE_EXIT_FADE }}
             className={cn(
               "flex min-w-0",
-              collapsed ? "w-(--sz-source-tile-two-up)" : "flex-1",
+              collapsed ? "w-(--sz-source-tile-two-up)" : "min-w-0",
             )}
           >
             <ModelSourceTile

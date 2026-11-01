@@ -201,6 +201,26 @@ describe("OnboardingWizard adapter selection", () => {
     });
   });
 
+  it("shows enabled non-Claude/Codex adapters in the model source picker", async () => {
+    mockDialog.onboardingOptions = { initialStep: 4 };
+    mockAdapterRegistry.list = [
+      { type: "claude_local" },
+      { type: "codex_local" },
+      { type: "gemini_local" },
+      { type: "opencode_local" },
+    ];
+
+    const { root } = await mount();
+
+    const sourceIds = [...document.querySelectorAll<HTMLButtonElement>("button[role='radio']")]
+      .map((button) => button.textContent?.trim());
+    expect(sourceIds).toEqual(["claude_local", "codex_local", "gemini_local", "opencode_local"]);
+
+    await act(async () => {
+      root.unmount();
+    });
+  });
+
   it("recovers a saved Codex runner draft without changing its model or runner", async () => {
     mockAdapterRegistry.list = [
       { type: "paperclip_runner" },

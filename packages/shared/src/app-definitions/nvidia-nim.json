@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "slug": "nvidia-nim",
+  "name": "NVIDIA NIM",
+  "description": "Connect NVIDIA-hosted NIM models through an OpenAI-compatible endpoint.",
+  "categories": ["ai"],
+  "branding": {"logoUrl": "/brands/apps/api-key-generic.svg"},
+  "urlPatterns": ["https://integrate.api.nvidia.com/*"],
+  "methods": [{
+    "key": "ai-api_key",
+    "label": "NVIDIA NIM API key",
+    "purpose": "ai",
+    "transport": "runtime_auth",
+    "auth": "api_key",
+    "ai": {"provider": "openai", "method": "api_key"},
+    "grantKinds": ["user", "organization"],
+    "ownershipModes": ["customer"],
+    "whenToUse": "Authenticate an agent with NVIDIA NIM.",
+    "guidanceMd": "Use the NVIDIA NIM OpenAI-compatible endpoint https://integrate.api.nvidia.com/v1 and select a model from NVIDIA's catalog.",
+    "riskTier": "S3",
+    "credentialFields": [{"key": "apiKey", "label": "API key", "type": "password", "required": true, "placeholder": "nvapi-…", "secret": true}],
+    "keyPlacement": {"location": "env", "name": "NVIDIA_NIM_API_KEY"}
+  }],
+  "tags": ["model-provider", "gateway"]
+}

@@ -87,6 +87,11 @@ export function AiConnectionSelect({
   );
   const incompatible =
     selected && !compatible.some((c) => c.id === selected.id);
+  const incompatibleMessage = selected?.routing?.protocol === "chat" && adapterType === "claude_local"
+    ? "This Chat Completions connection cannot run Claude Code. Choose the OpenCode or Hermes harness, or connect a Messages API connection."
+    : selected?.routing?.protocol === "messages" && adapterType !== "claude_local"
+      ? "This Messages API connection only supports Claude Code. Choose the Claude Code harness, or connect a Chat Completions connection."
+      : "This connection does not support the selected harness. Choose a compatible connection.";
   const change = (id: string) => {
     if (id === "connect") return onConnect();
     if (id === "responsible_user")
@@ -182,8 +187,7 @@ export function AiConnectionSelect({
         </p>
       ) : incompatible ? (
         <p role="alert" className="text-sm text-destructive">
-          This connection does not support the selected harness. Choose a
-          compatible connection.
+          {incompatibleMessage}
         </p>
       ) : selected && aiConnectionProblem(selected) ? (
         <p role="alert" className="text-sm text-destructive">

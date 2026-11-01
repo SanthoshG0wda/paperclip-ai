@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "slug": "free-claude-code",
+  "name": "Free Claude Code",
+  "description": "Connect a local Free Claude Code Anthropic-compatible proxy.",
+  "categories": ["ai"],
+  "branding": {"logoUrl": "/brands/apps/api-key-generic.svg"},
+  "urlPatterns": ["http://localhost:8082/*"],
+  "methods": [{
+    "key": "ai-api_key",
+    "label": "Free Claude Code proxy token",
+    "purpose": "ai",
+    "transport": "runtime_auth",
+    "auth": "api_key",
+    "ai": {"provider": "anthropic", "method": "api_key"},
+    "grantKinds": ["user", "organization"],
+    "ownershipModes": ["customer"],
+    "whenToUse": "Connect an agent to a local Free Claude Code proxy.",
+    "guidanceMd": "Start the proxy on http://localhost:8082. The proxy accepts Anthropic Messages traffic at its root base URL; do not append /v1.",
+    "riskTier": "S3",
+    "credentialFields": [{"key": "apiKey", "label": "Proxy token", "type": "password", "required": true, "placeholder": "freecc", "secret": true}],
+    "keyPlacement": {"location": "env", "name": "ANTHROPIC_AUTH_TOKEN"}
+  }],
+  "tags": ["model-provider", "gateway", "local"]
+}

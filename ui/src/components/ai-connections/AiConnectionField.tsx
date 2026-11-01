@@ -96,6 +96,14 @@ export function AiConnectionField({
     : pendingAdoption && pendingAdoption.mode !== "router"
       ? accounts.data?.connections.find(account => account.id === pendingAdoption.connectionId && account.grantId === pendingAdoption.grantId)
       : undefined;
+  const selectedConnection = value && value.mode !== "router" && value.mode !== "responsible_user"
+    ? accounts.data?.connections.find(account => account.id === value.connectionId && account.grantId === value.grantId)
+    : value?.mode === "responsible_user" ? personalDefault : undefined;
+  const incompatibleMessage = selectedConnection?.routing?.protocol === "chat" && adapterType === "claude_local"
+    ? "This Chat Completions connection cannot run Claude Code. Choose the OpenCode or Hermes harness, or connect a Messages API connection."
+    : selectedConnection?.routing?.protocol === "messages" && adapterType !== "claude_local"
+      ? "This Messages API connection only supports Claude Code. Choose the Claude Code harness, or connect a Chat Completions connection."
+      : "This connection does not support the current harness and model. Choose a compatible connection before saving.";
   const selectDefault = useMutation({
     mutationFn: async (result: NonNullable<typeof savedAccount>) => {
       // Reconnect retains the existing default and its access. A new account
@@ -134,8 +142,7 @@ export function AiConnectionField({
     <div className="space-y-4">
       {value && value.mode !== "router" && (!["opencode_local", "pi_local"].includes(adapterType) || Boolean(model)) && !isAiConnectionCompatible(value, adapterType, model) && (
         <p role="alert" className="text-sm text-destructive">
-          This connection does not support the current harness and model. Choose
-          a compatible connection before saving.
+          {incompatibleMessage}
         </p>
       )}
       {(compatiblePools.length > 0 || value?.mode === "router") && <label className="block space-y-1 text-sm">

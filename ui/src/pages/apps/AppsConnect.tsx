@@ -80,6 +80,9 @@ export function AppsConnect({ byoOnly = false, credentialSource = "paperclip_vau
       initialProvider={preset?.provider}
       initialProtocol={preset?.protocol}
       providerLabel={preset?.label}
+      initialBaseUrl={preset?.baseUrl}
+      initialAuth={preset?.auth}
+      initialModels={preset?.models}
       onCancel={() => navigate("/apps")}
       onComplete={binding => navigate(`/apps/${binding.connectionId}/permissions`)}
     />
